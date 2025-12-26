@@ -122,7 +122,7 @@ export default function Home() {
                                     value={formData.birthPlace}
                                     onChange={handleInputChange}
                                     className="input-field"
-                                    placeholder="City, Country..."
+                                    placeholder="City"
                                 />
                             </div>
 
@@ -134,7 +134,7 @@ export default function Home() {
                                 {isLoading ? (
                                     <>
                                         <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
-                                        Calculating...
+                                        ஜாதகம் கணிக்கப்பட்டுக் கொண்டிருக்கிறது…
                                     </>
                                 ) : "Generate Horoscope (ஜாதகம் கணிக்க)"}
                             </button>
@@ -198,7 +198,7 @@ export default function Home() {
                         </div>
 
                         <button className="restart-btn" onClick={() => { setResultData(null); setFormData({ name: "", dob: "", tob: "", birthPlace: "" }); }}>
-                            Start Over ↻
+                            Start Over (மற்றொரு ஜாதகம் பார்க்க) ↻
                         </button>
                     </div>
                 </div>

@@ -1,0 +1,21 @@
+Starting Diagnostics...
+Testing: x-api-key (lower)
+Status: 403
+Body: {"message":"Missing Authentication Token"}
+
+Testing: X-Api-Key (Pascal)
+Status: 403
+Body: {"message":"Missing Authentication Token"}
+
+Testing: apikey
+Status: 403
+Body: {"message":"Missing Authentication Token"}
+
+Testing: Authorization Bearer
+Status: 403
+Body: {"message":"Invalid key=value pair (missing equal-sign) in Authorization header (hashed with SHA-256
+
+Testing: Authorization Basic
+Status: 403
+Body: {"message":"Authorization header requires 'Credential' parameter. Authorization header requires 'Sig
+
