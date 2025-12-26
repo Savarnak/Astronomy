@@ -1,23 +1,17 @@
 "use client";
 
-import React, { useState, useRef, useEffect, FormEvent } from 'react';
+import React, { useState } from 'react';
 import { getHoroscope } from '@/lib/horoscope';
 import { HoroscopeFormData, HoroscopeResult } from '@/types';
 import PlanetBackground from '@/components/PlanetBackground';
 
 export default function Home() {
-    // --- Chat State ---
-    const [step, setStep] = useState<number>(0); // 0=Name, 1=DoB, 2=ToB, 3=Place, 4=Loading, 5=Done
-    const [messages, setMessages] = useState<Message[]>([
-        { id: 0, sender: "bot", text: "வணக்கம். ஜாதகக் கணிப்பிற்காக உங்கள் பெயரைத் தெரிவியுங்கள். (Welcome. Please tell me your name for horoscope prediction.)" }
-    ]);
-    const [inputValue, setInputValue] = useState("");
-    const [isTyping, setIsTyping] = useState(false);
+    // --- State ---
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [resultData, setResultData] = useState<HoroscopeResult | null>(null);
 
-    // Moon Phase Animation State
-    const [moonPhase, setMoonPhase] = useState("☽");
-
-    // Data Accumulation
+    // Form State
     const [formData, setFormData] = useState<HoroscopeFormData>({
         name: "",
         dob: "",
@@ -25,188 +19,154 @@ export default function Home() {
         birthPlace: "",
     });
 
-    // Result Data State for Cinematic Transition
-    const [resultData, setResultData] = useState<HoroscopeResult | null>(null);
-
-    const chatEndRef = useRef<HTMLDivElement>(null);
-
-    // Auto-scroll to bottom
-    useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, isTyping]);
-
-    // Handle Input Change & Typing State
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setInputValue(e.target.value);
-        if (e.target.value.length > 0) {
-            setIsTyping(true);
-
-            // Clear previous timeout if exists (debouncing logic not strictly needed for this visual effect but good practice)
-        } else {
-            setIsTyping(false);
-        }
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+        setError(null); // Clear error on type
     };
 
-    // Moon Phase Animation Effect
-    useEffect(() => {
-        const phases = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'];
-        let i = 0;
-        const interval = setInterval(() => {
-            setMoonPhase(phases[i]);
-            i = (i + 1) % phases.length;
-        }, 800);
-        return () => clearInterval(interval);
-    }, []);
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
 
-    const handleSend = async (e?: FormEvent) => {
-        if (e) e.preventDefault();
-        if (!inputValue.trim()) return;
-
-        const userText = inputValue.trim();
-
-        // Add user message
-        const newMessageId = messages.length + 1;
-        setMessages(prev => [...prev, { id: newMessageId, sender: "user", text: userText }]);
-        setInputValue(""); // Clear input
-        setIsTyping(false); // Stop typing visual immediately
-
-        // Process logic based on step
-
-        // STEP 0: Name -> Ask DOB
-        if (step === 0) {
-            setFormData(prev => ({ ...prev, name: userText }));
-            // Bot thinks
-            setTimeout(() => {
-                setMessages(prev => [...prev, { id: prev.length + 1, sender: "bot", text: "நன்றி. தயவுசெய்து உங்கள் பிறந்த தேதியை கூறுங்கள். (Thank you. Please tell me your Date of Birth.)" }]);
-                setStep(1);
-            }, 1000);
+        // Validation
+        if (!formData.name.trim()) {
+            setError("Please enter your name.");
+            return;
         }
-        // STEP 1: DOB -> Ask TOB
-        else if (step === 1) {
-            setFormData(prev => ({ ...prev, dob: userText }));
-            setTimeout(() => {
-                setMessages(prev => [...prev, { id: prev.length + 1, sender: "bot", text: "பிறந்த நேரத்தை தெரிவியுங்கள். (Please tell me your Time of Birth.)" }]);
-                setStep(2);
-            }, 1000);
+
+        const dobDate = new Date(formData.dob);
+        const today = new Date();
+        if (dobDate > today) {
+            setError("Date of Birth cannot be in the future.");
+            return;
         }
-        // STEP 2: TOB -> Ask Place
-        else if (step === 2) {
-            setFormData(prev => ({ ...prev, tob: userText }));
-            setTimeout(() => {
-                setMessages(prev => [...prev, { id: prev.length + 1, sender: "bot", text: "நீங்கள் பிறந்த இடத்தின் பெயரை குறிப்பிடுங்கள். (Please mention your Place of Birth.)" }]);
-                setStep(3);
-            }, 1000);
-        }
-        // STEP 3: Place -> Fetch Data
-        else if (step === 3) {
-            const finalData = { ...formData, birthPlace: userText };
-            setFormData(finalData);
 
-            // Loading Message
-            setTimeout(() => {
-                setMessages(prev => [...prev, { id: prev.length + 1, sender: "bot", text: "🔄 ஜாதகம் கணிக்கப்பட்டுக் கொண்டிருக்கிறது… தயவுசெய்து காத்திருக்கவும். (Generating horoscope... Please wait.)" }]);
-                setStep(4); // Loading state
+        setIsLoading(true);
 
-                // Fetch API
-                fetchHoroscope(finalData);
-            }, 1000);
-        }
-    };
-
-    const fetchHoroscope = async (data: HoroscopeFormData) => {
-        try {
-            const result = await getHoroscope(data);
-
-            // Artificial delay for suspense
-            setTimeout(() => {
+        // Artificial delay for cinematic effect
+        setTimeout(async () => {
+            try {
+                const result = await getHoroscope(formData);
                 setResultData(result);
-                setStep(5); // Trigger cinematic transition
-            }, 3000);
-
-        } catch (err) {
-            console.error(err);
-            setMessages(prev => [...prev, { id: prev.length + 1, sender: "bot", text: "Sorry, something went wrong. Please reload and try again." }]);
-        }
-    };
-
-    // Input type helper
-    const getInputType = () => {
-        if (step === 1) return "date";
-        if (step === 2) return "time";
-        return "text";
-    };
-
-    const getPlaceholder = () => {
-        if (step === 0) return "Type your name...";
-        if (step === 3) return "City, Country...";
-        return "Type here...";
+                setIsLoading(false);
+            } catch (err) {
+                console.error(err);
+                setIsLoading(false);
+                setError("Something went wrong. Please check your inputs or try again.");
+            }
+        }, 1500);
     };
 
     return (
         <div className="relative min-h-screen text-white overflow-hidden font-sans">
-            {/* CSS Background Scene - Reacts to typing */}
-            <PlanetBackground isTyping={isTyping} />
+            {/* CSS Background Scene */}
+            <PlanetBackground isTyping={false} />
 
-            {/* Main Chat Interface - Fades out when Step 5 (Result) is reached */}
-            <main className={`main-wrapper transition-all duration-1000 ${step === 5 ? 'fade-out' : ''}`}>
-                <header className="header">
-                    <h1>✨ ஜோதிடர் (Astrologer) ✨</h1>
-                    <div className="planet-progress">
-                        {/* Sun: Name (Step 0) */}
-                        <span className={`planet-step ${step === 0 ? 'active' : step > 0 ? 'completed' : ''} text-2xl`}>☉</span>
-                        {/* Moon: DOB (Step 1) - Animated Phase */}
-                        <span className={`planet-step ${step === 1 ? 'active' : step > 1 ? 'completed' : ''} text-2xl`}>{moonPhase}</span>
-                        {/* Mars: TOB (Step 2) */}
-                        <span className={`planet-step ${step === 2 ? 'active' : step > 2 ? 'completed' : ''} text-2xl`}>♂</span>
-                        {/* Venus: Place (Step 3) */}
-                        <span className={`planet-step ${step === 3 ? 'active' : step > 3 ? 'completed' : ''} text-2xl`}>♀</span>
-                        {/* Jupiter: Loading/Result (Step 4+) */}
-                        <span className={`planet-step ${step >= 4 ? 'active' : ''} text-2xl`}>♃</span>
-                    </div>
-                </header>
+            {/* Main Form Interface - Centered Overlay */}
+            {!resultData && (
+                <div className="form-overlay transition-all duration-500">
+                    <main className={`result-card-cinematic !opacity-100 !transform-none !animate-none !text-left ${isLoading ? 'blur-sm scale-95 opacity-50' : ''}`}>
+                        <header className="header mb-8 text-center">
+                            <h1>ஜோதிடர் (Astrologer) ✨</h1>
+                        </header>
 
-                <div className="chat-container">
-                    {messages.map((msg) => (
-                        <div key={msg.id} className={`message ${msg.sender} `}>
-                            {msg.text}
-                        </div>
-                    ))}
-
-                    {/* Bot Typing Indicator (Logic already existed, re-using CSS) */}
-                    {step === 4 && (
-                        <div className="typing-indicator">
-                            <span>🔮 ஜோதிடர் ஆராய்கிறார் (Analyzing)...</span>
-                            <div className="typing-dots">
-                                <div className="dot"></div>
-                                <div className="dot"></div>
-                                <div className="dot"></div>
+                        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+                            {/* Name */}
+                            <div className="input-group">
+                                <label className="input-label">Name (பெயர்)</label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    required
+                                    value={formData.name}
+                                    onChange={handleInputChange}
+                                    className="input-field"
+                                    placeholder="Enter your name..."
+                                />
                             </div>
-                        </div>
-                    )}
 
-                    <div ref={chatEndRef} />
+                            {/* DOB & TOB Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="input-group">
+                                    <label className="input-label">Date (பிறந்த தேதி)</label>
+                                    <input
+                                        type="date"
+                                        name="dob"
+                                        required
+                                        value={formData.dob}
+                                        onChange={handleInputChange}
+                                        className="input-field"
+                                    />
+                                </div>
+                                <div className="input-group">
+                                    <label className="input-label">Time (பிறந்த நேரம்)</label>
+                                    <input
+                                        type="time"
+                                        name="tob"
+                                        required
+                                        value={formData.tob}
+                                        onChange={handleInputChange}
+                                        className="input-field"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Place */}
+                            <div className="input-group">
+                                <label className="input-label">Place (பிறந்த இடம்)</label>
+                                <input
+                                    type="text"
+                                    name="birthPlace"
+                                    required
+                                    value={formData.birthPlace}
+                                    onChange={handleInputChange}
+                                    className="input-field"
+                                    placeholder="City, Country..."
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="restart-btn mt-6 w-full bg-gradient-to-r from-[#ffd700] to-[#daa520] !text-black border-none hover:scale-105 shadow-lg shadow-gold/20 flex items-center justify-center gap-2"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></span>
+                                        Calculating...
+                                    </>
+                                ) : "Generate Horoscope (ஜாதகம் கணிக்க)"}
+                            </button>
+
+                            {/* Error Message */}
+                            {error && (
+                                <div className="text-red-400 text-sm text-center bg-red-900/20 p-2 rounded-lg border border-red-500/30 animate-pulse">
+                                    ⚠️ {error}
+                                </div>
+                            )}
+                        </form>
+                    </main>
                 </div>
+            )}
 
-                {/* Input Area - Hidden if step 4 (Loading) or 5 (Done) */}
-                {step < 4 && (
-                    <form className="input-area" onSubmit={handleSend}>
-                        <input
-                            type={getInputType()}
-                            className="input-field"
-                            value={inputValue}
-                            onChange={handleInputChange}
-                            placeholder={getPlaceholder()}
-                            autoFocus
-                        />
-                        <button type="submit" className="send-btn" disabled={!inputValue}>
-                            <svg viewBox="0 0 24 24" className="send-icon"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
-                        </button>
-                    </form>
-                )}
-            </main>
 
-            {/* Cinematic Result View - Slides in when Step 5 is reached */}
-            {step === 5 && resultData && (
+            {/* Loading Indicator Overlay */}
+            {isLoading && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+                    <div className="typing-indicator bg-black/50 p-4 rounded-full backdrop-blur-md border border-white/10">
+                        <span>🔮 ஜோதிடர் ஆராய்கிறார் (Analyzing)</span>
+                        <div className="typing-dots">
+                            <div className="dot"></div>
+                            <div className="dot"></div>
+                            <div className="dot"></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cinematic Result View - Slides in when Result is ready */}
+            {resultData && (
                 <div className="result-view-container">
                     <div className="result-card-cinematic">
                         <div className="result-title">✨ ஜாதக விளக்கம் ✨</div>
@@ -237,7 +197,7 @@ export default function Home() {
                             <span className="cinematic-val">{resultData.longitude}</span>
                         </div>
 
-                        <button className="restart-btn" onClick={() => window.location.reload()}>
+                        <button className="restart-btn" onClick={() => { setResultData(null); setFormData({ name: "", dob: "", tob: "", birthPlace: "" }); }}>
                             Start Over ↻
                         </button>
                     </div>
@@ -247,11 +207,3 @@ export default function Home() {
     );
 }
 
-// Add Message type definition here or import it if better
-interface Message {
-    id: number;
-    sender: "bot" | "user";
-    text?: string;
-    isResult?: boolean;
-    resultData?: HoroscopeResult | null;
-}
